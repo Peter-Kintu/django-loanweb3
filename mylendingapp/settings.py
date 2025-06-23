@@ -6,6 +6,7 @@ from datetime import timedelta
 # --- DEBUGGING START ---
 # This line is added to confirm if this specific settings.py file is being loaded.
 print("--- Loading mylendingapp.settings ---")
+path = '/home/kintu2388/django-loanweb3'
 # --- DEBUGGING END ---
 
 # Load environment variables from .env file at the very top
