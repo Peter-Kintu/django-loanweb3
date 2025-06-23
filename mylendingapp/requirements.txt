@@ -1,0 +1,23 @@
+Django>=4.2
+djangorestframework
+psycopg2-binary
+web3
+celery
+redis
+python-dotenv
+# Production Server
+gunicorn
+
+# Static Files Handling
+whitenoise
+
+# Database Config Management
+dj-database-url
+Django~=4.2.0
+djangorestframework~=3.14.0
+djangorestframework-simplejwt~=5.3.0 # If you want to use JWT instead of TokenAuth
+django-cors-headers~=4.0.0
+python-dotenv~=1.0.0
+# Add other libraries as needed (e.g., web3.py for blockchain interaction)
+# web3~=6.0.0
+# requests~=2.31.0 # If you need to make external HTTP requests
