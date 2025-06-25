@@ -21,3 +21,19 @@ python-dotenv~=1.0.0
 # Add other libraries as needed (e.g., web3.py for blockchain interaction)
 # web3~=6.0.0
 # requests~=2.31.0 # If you need to make external HTTP requests
+Django>=4.2
+djangorestframework
+psycopg2-binary # For PostgreSQL, remove if using SQLite
+web3>=6.0.0 # Ensure web3.py is recent enough
+eth-account # Crucial for backend signing (even if temporary for demo)
+python-dotenv
+python-dateutil # For relativedelta in loans/views.py
+# Production Server
+gunicorn
+# Static Files Handling
+whitenoise
+# Database Config Management
+dj-database-url
+# Additional:
+django-cors-headers
+# django-jazzmin # If you installed Jazzmin for admin UI

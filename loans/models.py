@@ -1,68 +1,88 @@
 # mylendingapp_backend/loans/models.py
 from django.db import models
-from users.models import User # Assuming User model is in the users app
-from django.utils import timezone # Import for default values if needed, or in views
+from users.models import User
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 
 class Loan(models.Model):
-    borrower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='loans_as_borrower')
-    # RECOMMENDED ADDITION: A lender is crucial for a lending app
-    lender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='loans_as_lender',
-                               help_text="The user or entity providing the loan funds.")
+    LOAN_STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved - Awaiting Collateral/Funding'), # Contract deployed, waiting for borrower to provide collateral or lender to fund
+        ('active', 'Active - Loan Disbursed'), # Loan has been funded by a lender and is active
+        ('repaid', 'Repaid'),
+        ('overdue', 'Overdue'),
+        ('rejected', 'Rejected'),
+        ('liquidated', 'Liquidated'), # Collateral claimed by lender
+    ]
 
-    amount = models.DecimalField(max_digits=18, decimal_places=2) # e.g., in USDC or USD equivalent
-    duration_months = models.PositiveIntegerField(default=12, help_text="Duration of the loan in months.")
-    purpose = models.TextField(blank=True, null=True, help_text="Purpose of the loan.")
-    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.05,
-                                         help_text="Annual interest rate (e.g., 0.05 for 5%).")
+    borrower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='borrowed_loans')
+    lender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lent_loans')
 
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('pending', 'Pending Approval'),
-            ('approved', 'Approved'),
-            ('rejected', 'Rejected'),
-            ('active', 'Active Loan'), # Loan disbursed, payments expected
-            ('repaid', 'Repaid'),
-            ('overdue', 'Overdue'),
-            ('liquidated', 'Liquidated'), # Collateral seized or loan written off
-        ],
-        default='pending'
+    amount = models.DecimalField(max_digits=10, decimal_places=2) # Amount in local currency or USD equivalent
+    duration_months = models.PositiveIntegerField() # Duration in months
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00) # Annual interest rate (e.g., 0.05 for 5%)
+    purpose = models.TextField(blank=True, null=True)
+
+    status = models.CharField(max_length=30, choices=LOAN_STATUS_CHOICES, default='pending') # Increased max_length for new status
+
+    # --- NEW BLOCKCHAIN-RELATED FIELDS ---
+    contract_address = models.CharField(
+        max_length=42,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Address of the deployed P2PLoan smart contract."
     )
+    # Store the actual loan and collateral asset addresses used on-chain
+    # These might be different from the global configured ones for specific loans
+    loan_asset_contract_address = models.CharField(max_length=42, null=True, blank=True,
+                                                help_text="Address of the ERC-20 token used for the loan (e.g., DAI).")
+    collateral_asset_contract_address = models.CharField(max_length=42, null=True, blank=True,
+                                                      help_text="Address of the ERC-20 token used for collateral (e.g., WETH).")
 
-    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_loans',
-                                     help_text="Admin/Staff user who approved the loan.")
-    approved_date = models.DateTimeField(null=True, blank=True, help_text="Date and time when the loan was approved.")
+    # Optional: store transaction hashes for critical operations
+    deployment_tx_hash = models.CharField(max_length=66, unique=True, null=True, blank=True,
+                                          help_text="Transaction hash of contract deployment.")
+    disbursement_tx_hash = models.CharField(max_length=66, unique=True, null=True, blank=True,
+                                            help_text="Transaction hash of loan disbursement.")
+    repayment_tx_hash = models.CharField(max_length=66, unique=True, null=True, blank=True,
+                                         help_text="Transaction hash of loan repayment.")
+    liquidation_tx_hash = models.CharField(max_length=66, unique=True, null=True, blank=True,
+                                          help_text="Transaction hash of collateral liquidation.")
+    # --- END NEW FIELDS ---
 
-    # RENAMED for clarity: 'start_date' -> 'disbursement_date'
-    # This field should be set when the loan moves to 'active' status.
-    disbursement_date = models.DateTimeField(null=True, blank=True,
-                                             help_text="Date and time when the loan funds were disbursed.")
-    end_date = models.DateTimeField(null=True, blank=True, help_text="Expected date for full loan repayment.")
+    # Dates and approvals
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_loans')
+    approved_date = models.DateTimeField(null=True, blank=True)
+    disbursement_date = models.DateTimeField(null=True, blank=True) # When funds are actually sent to borrower
+    end_date = models.DateTimeField(null=True, blank=True) # Expected end date of the loan
 
-    repaid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00,
-                                         help_text="Total amount repaid so far.")
-    # RECOMMENDED ADDITION: To track when the last repayment occurred
-    last_repayment_date = models.DateTimeField(null=True, blank=True,
-                                               help_text="Date of the most recent repayment.")
-
-    created_at = models.DateTimeField(auto_now_add=True, help_text="Date and time when the loan application was created.")
-    updated_at = models.DateTimeField(auto_now=True, help_text="Date and time when the loan record was last updated.")
+    # Repayment tracking
+    repaid_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    last_repayment_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        verbose_name = "Loan"
-        verbose_name_plural = "Loans"
-        ordering = ['-created_at'] # Order by newest first
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"Loan {self.id} for {self.borrower.username} - {self.amount}"
+        return f"Loan #{self.id} to {self.borrower.username} for {self.amount} ({self.status})"
 
     @property
     def is_approved(self):
-        return self.status == 'approved'
+        return self.status == 'approved' or self.status == 'active'
+
+    @property
+    def is_active(self):
+        return self.status == 'active'
 
     @property
     def is_repaid(self):
         return self.status == 'repaid'
 
-    # You might want to add methods here for calculating remaining balance,
-    # payment schedule, etc.
+    def save(self, *args, **kwargs):
+        # Calculate end_date when loan is active/disbursed
+        if self.disbursement_date and not self.end_date:
+            self.end_date = self.disbursement_date + relativedelta(months=self.duration_months)
+        super().save(*args, **kwargs)

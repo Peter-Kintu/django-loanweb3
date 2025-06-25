@@ -1,4 +1,4 @@
-# django-backend/mylendingapp/urls.py
+# mylendingapp/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import (
@@ -14,9 +14,8 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Include app-specific URLs
-    # Each app handles its own routes under a specific API prefix
     path('api/users/', include('users.urls')),
-    path('api/wallet/', include('wallet.urls')),
-    path('api/loans/', include('loans.urls')),
+    path('api/wallet/', include('wallet.urls')), # Make sure this is included
+    path('api/loans/', include('loans.urls')),   # Make sure this is included
     path('api/kyc/', include('kyc.urls')),
 ]

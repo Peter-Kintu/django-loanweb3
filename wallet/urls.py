@@ -4,7 +4,9 @@ from .views import (
     UserWalletCreateView,
     UserWalletRetrieveUpdateView,
     WalletBalanceView,
-    erc20_token_balance
+    erc20_token_balance,
+    get_transaction_params, # New
+    broadcast_signed_transaction # New
 )
 
 urlpatterns = [
@@ -16,4 +18,8 @@ urlpatterns = [
     path('wallet/balance/', WalletBalanceView.as_view(), name='wallet-balance'),
     # Endpoint to get specific ERC-20 token balance
     path('wallet/token-balance/', erc20_token_balance, name='erc20-token-balance'),
+    # Endpoint to get current gas price and sender's nonce
+    path('wallet/transaction-params/', get_transaction_params, name='get-transaction-params'),
+    # Endpoint to broadcast a raw, signed transaction from the client
+    path('wallet/broadcast/', broadcast_signed_transaction, name='broadcast-signed-transaction'),
 ]
